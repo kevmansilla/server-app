@@ -15,11 +15,36 @@ class Connection(object):
     """
 
     def __init__(self, socket, directory):
-        # FALTA: Inicializar atributos de Connection
-        pass
+         
+        self.clientsocket = socket
+        self.directory = directory
+        self.closed = False
 
     def handle(self):
-        """
-        Atiende eventos de la conexión hasta que termina.
-        """
-        pass
+            """
+            Atiende eventos de la conexión hasta que termina.
+            """
+
+            while not self.closed:
+
+                message = self.clientsocket.recv(1024).decode() 
+
+                if message != '':
+                    print('Mensaje obtenido:', message)
+
+                    if message.startswith('get_file_listing'):
+                        print('Se ejecutara: get_file_listing')
+
+                    elif message.startswith('get_metadata'):
+                        print('Se ejecutara: get_metadata')
+
+                    elif message.startswith('get_slice'):
+                        print('Se ejecutara: get_slice')
+                    
+                    elif message.startswith('quit'):
+                        print('Se ejecutara: quit')
+                        self.closed = True
+                    
+                    else:
+                        print('Comando invalido: Se cerrara la conexión.')
+                        self.closed = True

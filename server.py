@@ -21,8 +21,14 @@ class Server(object):
     def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT,
                  directory=DEFAULT_DIR):
         print("Serving %s on %s:%s." % (directory, addr, port))
-        # FALTA: Crear socket del servidor, configurarlo, asignarlo
-        # a una dirección y puerto, etc.
+
+        # Creamos el socket:
+        self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serversocket.bind((addr, port))
+        self.directory = directory
+
+        # listen indica al socket el maximo de solicitudes de conexiones.
+        self.serversocket.listen(5)
 
     def serve(self):
         """
@@ -30,10 +36,19 @@ class Server(object):
         y se espera a que concluya antes de seguir.
         """
         while True:
-            pass
-            # FALTA: Aceptar una conexión al server, crear una
-            # Connection para la conexión y atenderla hasta que termine.
 
+            # Aceptamos conexiones desde el exterior.
+            self.clientsocket, self.address = self.serversocket.accept()
+            print("Connection from %s\n" % self.address[0])
+
+            # Creamos una instancia de la conexión para satisfacer los pedidos.
+            conection = connection.Connection(self.clientsocket, self.directory)
+            conection.handle()
+
+            # Si se ejecuta esta linea es porque se cerro una conexión:   
+            print("Se cerro una conexion.")
+
+            
 
 def main():
     """Parsea los argumentos y lanza el server"""

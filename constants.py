@@ -5,7 +5,7 @@
 # Copyright 2008-2010 Natalia Bidart y Daniel Moisset
 # $Id: constants.py 388 2011-03-22 14:20:06Z nicolasw $
 
-DEFAULT_DIR = 'testdata'
+DEFAULT_DIR = '.'
 DEFAULT_ADDR = '0.0.0.0'  # 0.0.0.0 representa todas las IPv4 del server
 DEFAULT_PORT = 19500
 
