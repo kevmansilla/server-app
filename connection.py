@@ -6,7 +6,6 @@
 from os import *
 from os.path import *
 import socket
-from telnetlib import STATUS
 from constants import *
 from base64 import b64encode
 
@@ -18,7 +17,6 @@ class Connection(object):
     """
 
     def __init__(self, socket, directory):
-         
         self.clientsocket = socket
         self.directory = directory
         self.status = 0
@@ -28,11 +26,8 @@ class Connection(object):
             """
             Atiende eventos de la conexión hasta que termina.
             """
-
             while not self.closed:
-
                 message = self.clientsocket.recv(1024).decode() 
-
                 if message != '':
                     print('Mensaje obtenido:', message)
 
@@ -40,8 +35,9 @@ class Connection(object):
                         response = get_file_listing(self.directory).encode()
                         self.clientsocket.send(response)
 
-                    elif message.startswith('get_metadata'):
-                        print('Se ejecutara: get_metadata')
+                    elif parser_get_metadata(message):
+                        response = get_metadata(self.directory, 'emilio_ravenna.txt').encode()
+                        self.clientsocket.send(response)
 
                     elif message.startswith('get_slice'):
                         print('Se ejecutara: get_slice')
@@ -62,7 +58,6 @@ def parser_get_file_listing(message):
     return (len(tokens) == 1) and (tokens[0] == 'get_file_listing')
 
 def get_file_listing(directory):
-
     # Obtenemos los archivos del directorio testdata:
     files = listdir(directory)
 
@@ -74,5 +69,25 @@ def get_file_listing(directory):
     for file in files:
         response += file + EOL
     response += EOL
+
+    return(header + response)
+
+def parser_get_metadata(message):
+    # Dividimos el mensaje en sus palabras.
+    tokens = message.split()
+
+    # El comando es correcto si es get_metadata y no tiene argumentos:
+    return (len(tokens) == 2) and (tokens[0] == 'get_metadata')
+
+def get_metadata(directory, filename):
+    # Obtenemos el tamaño del archivo:
+    path = directory + '/' + filename
+    size = getsize(path)
+
+    # Armamos la cabecera del mensaje:
+    header = str(CODE_OK) + ' ' + error_messages[CODE_OK] + EOL
+
+    # Armamos el mensaje de respuesta:
+    response = str(size) + EOL
 
     return(header + response)
