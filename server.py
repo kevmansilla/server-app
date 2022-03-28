@@ -46,7 +46,7 @@ class Server(object):
             conection.handle()
 
             # Si se ejecuta esta linea es porque se cerro una conexión:   
-            print("Se cerro una conexion.")
+            # print("Se cerro una conexion.")
 
             
 

@@ -3,7 +3,10 @@
 # Copyright 2014 Carlos Bederián
 # $Id: connection.py 455 2011-05-01 00:32:09Z carlos $
 
+from os import *
+from os.path import *
 import socket
+from telnetlib import STATUS
 from constants import *
 from base64 import b64encode
 
@@ -18,6 +21,7 @@ class Connection(object):
          
         self.clientsocket = socket
         self.directory = directory
+        self.status = 0
         self.closed = False
 
     def handle(self):
@@ -32,8 +36,9 @@ class Connection(object):
                 if message != '':
                     print('Mensaje obtenido:', message)
 
-                    if message.startswith('get_file_listing'):
-                        print('Se ejecutara: get_file_listing')
+                    if parser_get_file_listing(message):
+                        response = get_file_listing(self.directory).encode()
+                        self.clientsocket.send(response)
 
                     elif message.startswith('get_metadata'):
                         print('Se ejecutara: get_metadata')
@@ -48,3 +53,26 @@ class Connection(object):
                     else:
                         print('Comando invalido: Se cerrara la conexión.')
                         self.closed = True
+
+def parser_get_file_listing(message):
+    # Dividimos el mensaje en sus palabras.
+    tokens = message.split()
+
+    # El comando es correcto si es get_file_listing y no tiene argumentos:
+    return (len(tokens) == 1) and (tokens[0] == 'get_file_listing')
+
+def get_file_listing(directory):
+
+    # Obtenemos los archivos del directorio testdata:
+    files = listdir(directory)
+
+    # Armamos la cabecera del mensaje:
+    header = str(CODE_OK) + ' ' + error_messages[CODE_OK] + EOL
+
+    # Armamos el mensaje de respuesta:
+    response = ''
+    for file in files:
+        response += file + EOL
+    response += EOL
+
+    return(header + response)
