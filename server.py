@@ -48,8 +48,6 @@ class Server(object):
             # Si se ejecuta esta linea es porque se cerro una conexión:   
             # print("Se cerro una conexion.")
 
-            
-
 def main():
     """Parsea los argumentos y lanza el server"""
 

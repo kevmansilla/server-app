@@ -30,32 +30,25 @@ class Connection(object):
                 message = self.clientsocket.recv(1024).decode() 
                 if message != '':
                     print('Mensaje obtenido:', message)
-
-                    if parser_get_file_listing(message):
+                    tokens = message.split()
+                    if (tokens[0] == 'get_file_listing'):
                         response = get_file_listing(self.directory).encode()
                         self.clientsocket.send(response)
-
-                    elif parser_get_metadata(message):
-                        response = get_metadata(self.directory, 'emilio_ravenna.txt').encode()
+                    elif (tokens[0] == 'get_metadata'):
+                        name = tokens[1]
+                        response = get_metadata(self.directory, name).encode()
                         self.clientsocket.send(response)
-
                     elif message.startswith('get_slice'):
                         print('Se ejecutara: get_slice')
-                    
                     elif message.startswith('quit'):
-                        print('Se ejecutara: quit')
+                        header = str(CODE_OK) + ' ' + \
+                            error_messages[CODE_OK] + EOL
+                        self.clientsocket.send(header.encode())
+                        self.clientsocket.close()
                         self.closed = True
-                    
                     else:
                         print('Comando invalido: Se cerrara la conexión.')
                         self.closed = True
-
-def parser_get_file_listing(message):
-    # Dividimos el mensaje en sus palabras.
-    tokens = message.split()
-
-    # El comando es correcto si es get_file_listing y no tiene argumentos:
-    return (len(tokens) == 1) and (tokens[0] == 'get_file_listing')
 
 def get_file_listing(directory):
     # Obtenemos los archivos del directorio testdata:
@@ -72,13 +65,6 @@ def get_file_listing(directory):
 
     return(header + response)
 
-def parser_get_metadata(message):
-    # Dividimos el mensaje en sus palabras.
-    tokens = message.split()
-
-    # El comando es correcto si es get_metadata y no tiene argumentos:
-    return (len(tokens) == 2) and (tokens[0] == 'get_metadata')
-
 def get_metadata(directory, filename):
     # Obtenemos el tamaño del archivo:
     path = directory + '/' + filename
@@ -91,3 +77,5 @@ def get_metadata(directory, filename):
     response = str(size) + EOL
 
     return(header + response)
+
+# def get_slice(directory, filename, offset, size):
