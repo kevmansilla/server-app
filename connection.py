@@ -4,13 +4,11 @@
 # $Id: connection.py 455 2011-05-01 00:32:09Z carlos $
 
 from os import listdir
-from os.path import getsize, exists
-import queue
+from os.path import getsize, exists, isdir
 import socket
 from constants import *
 from base64 import b64encode
 
-BUFFER_SIZE = 4096
 
 class Connection(object):
     """
@@ -25,10 +23,141 @@ class Connection(object):
         self.status = CODE_OK
         self.closed = False
 
-    def quit(self):
-        response = get_response_message(CODE_OK, '')
-        self.clientsocket.send(response)
-        self.closed = True
+    def check_num_args(self, tokens):
+        '''
+        Comprueba si el comando ingresado tiene la correcta
+        cantidad de argumentos.
+        '''
+        if tokens[0] == 'get_file_listing':
+            self.status = CODE_OK if len(tokens) == 1 else INVALID_ARGUMENTS
+        elif tokens[0] == 'get_metadata':
+            self.status = CODE_OK if len(tokens) == 2 else INVALID_ARGUMENTS
+        elif tokens[0] == 'get_slice':
+            self.status = CODE_OK if len(tokens) == 4 else INVALID_ARGUMENTS
+        elif tokens[0] == 'quit':
+            self.status = CODE_OK if len(tokens) == 1 else INVALID_ARGUMENTS
+
+    def check_valid_file(self, filename):
+        '''
+        Comprueba si un archivo existe en el directorio y que su
+        nombre sea valido.
+        '''
+        path = self.directory + '/' + filename
+        if isdir(self.directory):
+            set_chars = set(filename)
+            set_chars = set_chars.difference(VALID_CHARS)
+            self.status = CODE_OK if exists(path) and len(
+                filename) < 80 and len(set_chars) == 0 else FILE_NOT_FOUND
+        else:
+            self.status = FILE_NOT_FOUND
+
+    def check_type_args(self, tokens):
+        '''
+        Comprueba que el tipo de los argumentos de 
+        la funcion get_slice sean validos.
+        '''
+        if tokens[0] == 'get_slice':
+            self.status = CODE_OK if tokens[2].isnumeric(
+            ) and tokens[3].isnumeric() else INVALID_ARGUMENTS
+
+    def check_valid_values(self, tokens):
+        '''
+        Comprueba que los valores de los argumentos de 
+        la funcion get_slice sean validos.
+        '''
+        if tokens[0] == 'get_slice':
+            filename = tokens[1]
+            offset = int(tokens[2])
+            size = int(tokens[3])
+            path = self.directory + '/' + filename
+            file_size = getsize(path)
+            valid_position = offset >= 0 and size >= 0 and offset+size <= file_size
+            self.status = CODE_OK if valid_position else BAD_OFFSET
+
+    def get_response_message(self, message=''):
+        '''
+        Arma un mensaje de respuesta en bytes concatenando
+        el header y la respuesta del comando.
+        '''
+        response = str(self.status) + ' ' + error_messages[self.status] + EOL
+        if self.status == CODE_OK:
+            response += message + EOL
+        return response.encode()
+
+    def execute_command(self, tokens):
+        '''
+        Ejecuta un comando simple.
+        '''
+        response = ''
+        if tokens[0] == 'get_file_listing':
+            self.check_num_args(tokens)
+            if self.status == CODE_OK:
+                if isdir(self.directory):
+                    response = self.get_file_listing()
+                else:
+                    self.status = FILE_NOT_FOUND
+
+        elif tokens[0] == 'get_metadata':
+            self.check_num_args(tokens)
+            if self.status == CODE_OK:
+                self.check_valid_file(tokens[1])
+                if self.status == CODE_OK:
+                    response = self.get_metadata(tokens[1])
+
+        elif tokens[0] == 'get_slice':
+            self.check_num_args(tokens)
+            if self.status == CODE_OK:
+                filename = tokens[1]
+                offset = tokens[2]
+                size = tokens[3]
+                self.check_valid_file(filename)
+                if self.status == CODE_OK:
+                    self.check_type_args(tokens)
+                    if self.status == CODE_OK:
+                        self.check_valid_values(tokens)
+                        if self.status == CODE_OK:
+                            response = self.get_slice(filename, offset, size)
+
+        elif tokens[0] == 'quit':
+            self.check_num_args(tokens)
+            if self.status == CODE_OK:
+                self.closed = True
+
+        else:  # Comando inexistente
+            self.status = INVALID_COMMAND
+
+        return self.get_response_message(response)
+
+    def get_metadata(self, filename):
+        '''
+        Obtiene el tamaño en bytes de un archivo.
+        '''
+        path = self.directory + '/' + filename
+        size = getsize(path)
+        response = str(size)
+        return response
+
+    def get_file_listing(self):
+        '''
+        Obtiene una lista con los archivos del directorio.
+        '''
+        files = listdir(self.directory)
+        response = ''
+        for file in files:
+            response += file + EOL
+        return response
+
+    def get_slice(self, filename, offset, size):
+        '''
+        Obtiene trozos de un archivo.
+        '''
+        path = self.directory + '/' + filename
+        file = open(path, 'rb')
+        file.seek(int(offset))
+        content = file.read(int(size))
+        file.close()
+        cont_decode = b64encode(content).decode()
+        return cont_decode
 
     def handle(self):
         """
@@ -38,122 +167,41 @@ class Connection(object):
         # Inicializamos la queue de eventos:
         events_queue = ''
         while not self.closed:
-                            
+
             message = self.clientsocket.recv(1024).decode()
             
-            if message == '':
-                # No se recibieron datos.
+            # Si no se reciben mensajes cerramos la conexión:
+            if len(message) < 1:
                 self.closed = True
-            else:
-                # Añadimos el mensaje a la cola de eventos:
-                events_queue += message
+           
+            #Agregamos el mensaje a la cola de eventos:
+            events_queue += message
 
-            # Si EOL no esta in la cola de eventos significa que no se ha terminado de recibir el comando.
+
+            # Si EOL no esta in la cola de eventos significa que no
+            # se ha terminado de recibir el comando.
             # Entonces esperamos a que se termine de formar el comando.
             if not (EOL in events_queue):
                 continue
 
-            # Una vez que se recibieron comandos completos, tomamos el primer comando de la cola y lo sacamos:
+            # Una vez que se recibieron comandos completos, tomamos el primer
+            # comando de la cola y lo desencolamos:
             simple_command, events_queue = events_queue.split(EOL, 1)
 
-            # Comprobamos que el comando este bien formado. Caso contrario envamos mensaje de error y cerramos conexión:
+            # Comprobamos que el comando este bien formado. Caso contrario
+            # enviamos mensaje de error y cerramos conexión:
             if '\n' in simple_command:
                 self.status = BAD_EOL
-                response = get_response_message(BAD_EOL, '')
+                response = self.get_response_message()
                 self.clientsocket.send(response)
                 break
 
-            # Dividimos el comando en sus argumentos:    
+            # Obtenemos los argumentos del comando y lo ejecutamos:
             tokens = simple_command.split()
+            response = self.execute_command(tokens)
 
-            # El primer elemento de tokens es el comando, los demas elementos son los argumentos:
-            if tokens[0] == 'get_file_listing':
-                body = ''
-                if len(tokens) != 1:
-                    self.status = INVALID_ARGUMENTS
-                body = get_file_listing(self.directory)
-                response = get_response_message(self.status, body)
-                self.clientsocket.send(response)
-            
-            elif tokens[0] == 'get_metadata':
-                body = ''                          
-                if len(tokens) != 2:
-                    self.status = INVALID_ARGUMENTS
-                else:
-                    filename = tokens[1]
-                    path = self.directory + '/' + filename
-                    if not exists(path) or len(filename) > 80:
-                        self.status = FILE_NOT_FOUND
-                    else:
-                        body = get_metadata(path)
-                response = get_response_message(self.status, body)
-                self.clientsocket.send(response)
+            # Mandamos la respuesta obtenida al cliente:
+            self.clientsocket.send(response)
 
-            elif tokens[0] == 'get_slice':
-                body = ''                          
-                if len(tokens) != 4:
-                    self.status = INVALID_ARGUMENTS
-                else:
-                    filename = tokens[1]
-                    offset = tokens[2]
-                    size = tokens[3]
-                    if not(offset.isnumeric() and size.isnumeric()):
-                        self.status = INVALID_ARGUMENTS
-                    else:
-                        path = self.directory + '/' + filename
-                        if not exists(path) or len(filename) > 80:
-                            self.status = FILE_NOT_FOUND
-                        else:
-                            body = get_slice(self.directory, filename, offset, size)
-                response = get_response_message(self.status, body)
-                self.clientsocket.send(response)
-                        
-            elif tokens[0] == 'quit':
-                if len(tokens) != 1:
-                    self.status = INVALID_ARGUMENTS
-                    response = get_response_message(self.status, '')
-                    self.clientsocket.send(response)
-                else:
-                    self.quit()
-            else:
-                self.status = INVALID_COMMAND
-                response = get_response_message(self.status, '')
-                self.clientsocket.send(response)
-        
         # Si la conexión esta cerrada, cerramos el socket.
         self.clientsocket.close()
-
-def get_file_listing(directory):
-    files = listdir(directory)
-    response = ''
-    for file in files:
-        response += file + EOL
-    return response
-
-def get_metadata(filename):
-    size = getsize(filename)
-    response = str(size)
-    return response
-
-def get_slice(directory, filename, offset, size):
-    path = directory +  '/' + filename
-    file = open(path, 'r')
-    file.seek(int(offset))
-    content = file.read(int(size)).encode()
-    file.close()
-    cont_decode = b64encode(content).decode()
-    return cont_decode
-
-def get_response_message(code_error, message):
-    """
-    Se encarga de formar el encabezado y concatenarlo 
-    con el mensaje de respuesta.
-    """
-    header = str(code_error) + ' ' + error_messages[code_error] + EOL
-    response = header
-    if code_error == CODE_OK:
-        body = message + EOL
-        response += body
-        
-    return response.encode()
-
