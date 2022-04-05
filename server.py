@@ -10,7 +10,24 @@ import optparse
 import socket
 import connection
 from constants import *
+from threading import Thread
 
+class MultiClient(Thread):
+    """
+    Hilos para multicliente
+    """
+
+    def __init__(self, address, clientsocket, directory):
+        Thread.__init__(self)
+        self.socket = clientsocket
+        self.directory = directory
+        print("New connection added: ", address)
+
+    # Lo que ejecuta el thread
+    def run(self):
+        connec = connection.Connection(self.socket, self.directory)
+        connec.handle()
+        self.socket.close()
 
 class Server(object):
     """
@@ -36,17 +53,13 @@ class Server(object):
         y se espera a que concluya antes de seguir.
         """
         while True:
-
             # Aceptamos conexiones desde el exterior.
             self.clientsocket, self.address = self.serversocket.accept()
             print("Connection from %s\n" % self.address[0])
 
-            # Creamos una instancia de la conexión para satisfacer los pedidos.
-            conection = connection.Connection(self.clientsocket, self.directory)
-            conection.handle()
-
-            # Si se ejecuta esta linea es porque se cerro una conexión:   
-            # print("Se cerro una conexion.")
+            # Multicliente
+            newthread = MultiClient(self.address, self.clientsocket, self.directory)
+            newthread.start()
 
 def main():
     """Parsea los argumentos y lanza el server"""
