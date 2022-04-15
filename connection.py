@@ -163,45 +163,52 @@ class Connection(object):
         """
         Atiende eventos de la conexión hasta que termina.
         """
+        try:
+            # Inicializamos la queue de eventos:
+            events_queue = ''
+            while not self.closed:
 
-        # Inicializamos la queue de eventos:
-        events_queue = ''
-        while not self.closed:
-
-            message = self.clientsocket.recv(1024).decode()
+                message = self.clientsocket.recv(1024).decode()
+                
+                # Si no se reciben mensajes cerramos la conexión:
+                if len(message) < 1:
+                    self.closed = True
             
-            # Si no se reciben mensajes cerramos la conexión:
-            if len(message) < 1:
-                self.closed = True
-           
-            #Agregamos el mensaje a la cola de eventos:
-            events_queue += message
+                #Agregamos el mensaje a la cola de eventos:
+                events_queue += message
 
 
-            # Si EOL no esta in la cola de eventos significa que no
-            # se ha terminado de recibir el comando.
-            # Entonces esperamos a que se termine de formar el comando.
-            if not (EOL in events_queue):
-                continue
+                # Si EOL no esta en la cola de eventos significa que no
+                # se ha terminado de recibir el comando.
+                # Entonces esperamos a que se termine de formar el comando.
+                if not (EOL in events_queue):
+                    continue
 
-            # Una vez que se recibieron comandos completos, tomamos el primer
-            # comando de la cola y lo desencolamos:
-            simple_command, events_queue = events_queue.split(EOL, 1)
+                # Una vez que se recibieron comandos completos, tomamos el primer
+                # comando de la cola y lo desencolamos:
+                simple_command, events_queue = events_queue.split(EOL, 1)
 
-            # Comprobamos que el comando este bien formado. Caso contrario
-            # enviamos mensaje de error y cerramos conexión:
-            if '\n' in simple_command:
-                self.status = BAD_EOL
-                response = self.get_response_message()
+                # Comprobamos que el comando este bien formado. Caso contrario
+                # enviamos mensaje de error y cerramos conexión:
+                if '\n' in simple_command:
+                    self.status = BAD_EOL
+                    response = self.get_response_message()
+                    self.clientsocket.send(response)
+                    break
+
+                # Obtenemos los argumentos del comando y lo ejecutamos:
+                tokens = simple_command.split()
+                response = self.execute_command(tokens)
+
+                # Mandamos la respuesta obtenida al cliente:
                 self.clientsocket.send(response)
-                break
 
-            # Obtenemos los argumentos del comando y lo ejecutamos:
-            tokens = simple_command.split()
-            response = self.execute_command(tokens)
+            # Si la conexión esta cerrada, cerramos el socket.
+            self.clientsocket.close()
 
-            # Mandamos la respuesta obtenida al cliente:
+        # Si ocurre un error con el socket, cerramos la conexion con el cliente.
+        except socket.error:
+            self.status = INTERNAL_ERROR
+            response = self.get_response_message()
             self.clientsocket.send(response)
-
-        # Si la conexión esta cerrada, cerramos el socket.
-        self.clientsocket.close()
+            self.clientsocket.close()

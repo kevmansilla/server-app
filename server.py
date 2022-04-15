@@ -41,6 +41,10 @@ class Server(object):
 
         # Creamos el socket:
         self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Soluciona un OSError (leer documentación):
+        self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.serversocket.bind((addr, port))
         self.directory = directory
 
