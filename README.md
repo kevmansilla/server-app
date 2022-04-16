@@ -52,7 +52,14 @@ En python se pueden crear nuevos procesos mediante *forks* y otras funciones com
 
 La implementación de multicliente fue realizada con el módulo `thread`, el cual contiene una clase `Thread` para crear los hilos de ejecución. También hay que definir un método `run` donde se encuentra el código que ejecutara nuestro *thread*. Por último para que el hilo comience a ejecutar su código basta con crear una instancia de la clase que definimos y llamar a su método `start` y entonces el código del hilo principal y el del que acabamos de crear se ejecutaran de forma concurrente.
 
-2. Pruebe ejecutar el servidor en una máquina del laboratorio, mientras utiliza el cliente desde otra, hacia la ip de la máquina servidor. ¿Qué diferencia hay si se corre el servidor desde la IP "localhost", "127.0.0.1" o la ip "0.0.0.0"?
+2. Pruebe ejecutar el servidor en una máquina del laboratorio, mientras utiliza el cliente desde otra, hacia la ip de la máquina servidor. ¿Qué diferencia hay si se corre el servidor desde la IP "*localhost*", "127.0.0.1" o la ip "0.0.0.0"?
+
+La dirección IP 127.0.0.1, también llamada *loopback*, es exclusivamente para uso *localhost*, está dirección se utiliza para establecer una conexión IP con la misma máquina o computadora que utiliza el usuario final.
+
+Por otra parte 0.0.0.0 es una dirección no enrutable, es decir, que no se encuentra ligada a ninguna dirección remota en particular. En el contexto de los servidores significa todas las direcciones IPv4. Básicamente es el marcador de posición sin dirección en particular, por ejemplo si un *host* tiene dos direcciones IP, 192.168.1.1 y 10.1.2.1, y un servidor que se ejecuta en el *host* escucha en 0.0.0.0, será accesible en ambas direcciones IP.
+
+Entonces cuando un servicio está a la escucha en 0.0.0.0 significa que el servicio está a la escucha en todas las interfaces de red configuradas, cuando está a la escucha en 127.0.0.1 el servicio sólo está vinculado a la interfaz loopback.
+
 
 ## Integrantes del grupo:
 
@@ -64,4 +71,4 @@ La implementación de multicliente fue realizada con el módulo `thread`, el cua
 - https://duenaslerin.com/tico2/pdfs/python-para-todos.pdf
 - https://docs.python.org/es/3/howto/sockets.html
 - https://rico-schmidt.name/pymotw-3/socket/tcp.html
-- https://duenaslerin.com/tico2/pdfs/python-para-todos.pdf
+- https://www.thefastcode.com/es-eur/article/what-is-the-difference-between-127-0-0-1-and-0-0-0-0
